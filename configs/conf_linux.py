@@ -22,7 +22,7 @@ conf.data.input_size = (400, 640)
 conf.model.in_channels = 1
 conf.model.n_classes = 3
 conf.model.inc_channels = 16
-conf.model.init_lr = 5e-3
+conf.model.init_lr = 1e-3
 
 # train conf
 conf.train.devices = [4, 5, 6, 7]

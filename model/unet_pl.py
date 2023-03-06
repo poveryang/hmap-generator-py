@@ -49,7 +49,7 @@ class FocalLoss(nn.Module):
 
 
 class LitUNet(UNet, pl.LightningModule):
-    def __init__(self, model_conf, sample_loader):
+    def __init__(self, model_conf, sample_loader=None):
         super().__init__(**vars(model_conf))
         self.loss = FocalLoss()
         self.sample_loader = sample_loader
@@ -70,6 +70,8 @@ class LitUNet(UNet, pl.LightningModule):
         return loss
 
     def on_validation_end(self):
+        if self.sample_loader is None:
+            return
         images, targets = next(iter(self.sample_loader))
         images = images.to(self.device)
         preds = self.forward(images)

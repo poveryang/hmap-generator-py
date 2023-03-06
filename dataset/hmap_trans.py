@@ -84,13 +84,11 @@ def calc_patch_weight(gray_patch):
     n_under_thresh = len(under_thresh)
     n_over_thresh = len(over_thresh)
     n_total = n_under_thresh + n_over_thresh
-    balance_weight = 3 * min(n_under_thresh, n_over_thresh) / n_total
-
-    # clip and merge weights
-    contrast_weight = min(contrast_weight, 1)
-    contrast_weight = max(contrast_weight, 0.2)
-    balance_weight = min(balance_weight, 1)
-    balance_weight = max(balance_weight, 0.2)
+    balance_weight = np.cos(np.pi / 2 * (n_under_thresh - n_over_thresh) / n_total)
+    contrast_weight = 1.2 * min(contrast_weight, 1.2)
+    contrast_weight = max(contrast_weight, 0.4)
+    balance_weight = min(balance_weight, 1.2)
+    balance_weight = max(balance_weight, 0.4)
 
     weight = contrast_weight * balance_weight
     weight = max(weight, 0.1)

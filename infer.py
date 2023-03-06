@@ -6,8 +6,8 @@ from torch.utils.data import DataLoader
 import torchvision.transforms.functional as TF
 
 from dataset.hamp_ds import HeatMapDataset
-from model import LitUNet
-from configs.conf_win import conf
+from model.unet_pl import LitUNet
+from configs.conf_linux import conf
 import matplotlib.pyplot as plt
 
 
@@ -35,8 +35,9 @@ def infer_single_image(model_path, image_path):
     # blend
     image = (image / 255.0).astype(np.float32)
     image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-    cv2.addWeighted(image, 0.5, hmap, 0.5, 0, hmap)
-    ax[2].imshow(hmap)
+
+    blend = cv2.addWeighted(image, 0.5, hmap, 0.5, 0)
+    ax[2].imshow(blend)
     ax[2].set_title('blended image')
     plt.show()
 
@@ -50,26 +51,12 @@ def preprocess(image):
 
 
 def postprocess(hmap):
+    hmap = torch.sigmoid(hmap)
+    hmap = torch.permute(hmap, (0, 2, 3, 1))
     hmap = hmap[0].detach().numpy()
-    hmap = (hmap - hmap.min()) / (hmap.max() - hmap.min())
+    # hmap = (hmap - hmap.min()) / (hmap.max() - hmap.min())
     hmap = cv2.resize(hmap, (1280, 800))
     return hmap
-
-
-def batch_infer(model_path, data_dir):
-    model = LitUNet(conf.model).load_from_checkpoint(model_path, model_conf=conf.model)
-    model.eval()
-
-    dataset = HeatMapDataset(data_dir, mode='test')
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
-
-    for images, targets in dataloader:
-        model_out = model.forward(images)
-        images = images * 0.2349 + 0.4330
-        heat_map = model_out
-        pass
-    flops, params = profile(model, inputs=(images,))
-    print(f"Flops: {flops / 1e9:.3f}G, Params: {params / 1e6:.3f}M")
 
 
 def to_onnx(model_path, onnx_path):
@@ -81,10 +68,10 @@ def to_onnx(model_path, onnx_path):
 
 
 if __name__ == '__main__':
-    to_onnx("ckpt/hmap-v3-e99-fp32.ckpt",
-            "ckpt/hmap-v3-e99-fp32.onnx")
+    # to_onnx("ckpt/hmap-v3-e99-fp32.ckpt",
+    #         "ckpt/hmap-v3-e99-fp32.onnx")
 
-    # infer_single_image(
-    #     model_path="ckpt/hmap-v3-e99-fp32.ckpt",
-    #     image_path="data/test1.png"
-    # )
+    infer_single_image(
+        model_path="./test/ckpt/hmap_epoch=003_val_loss=0.0002.ckpt",
+        image_path="./test/data/test4.png"
+    )
