@@ -60,15 +60,15 @@ class HeatMapDataset(Dataset):
         image = TF.to_tensor(image)
 
         # Random adjust image's brightness, contrast, blur
-        if random.random() < 0.3 and not self.eval:
+        if random.random() < 0.2 and not self.eval:
             factor = random.uniform(0.5, 2)
             image = TF.adjust_brightness(image, factor)
 
-        if random.random() < 0.3 and not self.eval:
+        if random.random() < 0.2 and not self.eval:
             factor = random.uniform(0.5, 2)
             image = TF.adjust_contrast(image, factor)
 
-        if random.random() < 0.3 and not self.eval:
+        if random.random() < 0.2 and not self.eval:
             ksize = random.choice((3, 7, 11))
             image = TF.gaussian_blur(image, kernel_size=[ksize, ksize])
 
@@ -94,13 +94,13 @@ class HeatMapDataset(Dataset):
             hmap = TF.vflip(hmap)
 
         # Random rotation
-        if random.random() < 0.3 and not self.eval:
+        if random.random() < 0.2 and not self.eval:
             angle = random.randint(-90, 90)
             image = TF.rotate(image, angle)
             hmap = TF.rotate(hmap, angle)
 
         # Random crop resize
-        if random.random() < 0.7 and not self.eval:
+        if random.random() < 0.8 and not self.eval:
             image, hmap = self.crop_resize(image, hmap)
         else:
             image, hmap = self.aspect_resize(image, hmap)
@@ -111,7 +111,7 @@ class HeatMapDataset(Dataset):
         if random.random() < crop_prob:
             img_size = list(image.shape[-2:])
 
-            crop_rate = random.uniform(0.6, 0.8)
+            crop_rate = random.uniform(0.7, 0.9)
             crop_size = [int(img_size[0] * crop_rate), int(img_size[1] * crop_rate)]
 
             offset_rate = random.uniform(-0.2, 0.2)
@@ -201,5 +201,9 @@ if __name__ == '__main__':
         input_size=(400, 640))
     dataloader = DataLoader(dataset, batch_size=16, shuffle=False, pin_memory=True, num_workers=8)
 
-    for i, (im, hm) in enumerate(tqdm(dataloader)):
+    for i, (img, hmap) in enumerate(tqdm(dataloader)):
+        # blended = blend_image_hmap_tensor(img, hmap)
+        # plt.figure(figsize=(6.4 * 4, 4))
+        # plt.imshow(blended.permute(1, 2, 0))
+        # plt.show()
         pass
