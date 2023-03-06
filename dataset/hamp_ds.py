@@ -201,9 +201,5 @@ if __name__ == '__main__':
         input_size=(400, 640))
     dataloader = DataLoader(dataset, batch_size=16, shuffle=False, pin_memory=True, num_workers=8)
 
-    for i, (img, hmap) in enumerate(tqdm(dataloader)):
-        # blended = blend_image_hmap_tensor(img, hmap)
-        # plt.figure(figsize=(6.4 * 4, 4))
-        # plt.imshow(blended.permute(1, 2, 0))
-        # plt.show()
+    for i, (im, hm) in enumerate(tqdm(dataloader)):
         pass
