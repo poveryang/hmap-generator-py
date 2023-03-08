@@ -72,6 +72,6 @@ if __name__ == '__main__':
     #         "ckpt/hmap-v3-e99-fp32.onnx")
 
     infer_single_image(
-        model_path="./test/ckpt/hmap_epoch=003_val_loss=0.0002.ckpt",
-        image_path="./test/data/test4.png"
+        model_path="./test/ckpt/hmap_epoch=099_val_loss=0.000295.ckpt",
+        image_path="./test/data/exp-3.png"
     )

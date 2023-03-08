@@ -38,7 +38,7 @@ def generate_hmap(instances, image):
 
         # 2. The line function of the box's axes (a*x+b*y+c)
         a1 = np.cos(np.deg2rad(rot_angle))
-        b1 = np.sin(np.deg2rad1g2rad(rot_angle))
+        b1 = np.sin(np.deg2rad(rot_angle))
         c1 = -a1 * x_center - b1 * y_center
         const1 = np.sqrt(a1 ** 2 + b1 ** 2)
 
@@ -78,18 +78,16 @@ def calc_patch_weight(gray_patch):
     over_thresh = gray_patch[gray_patch > thres]
     mean_left = np.mean(under_thresh) if len(under_thresh) > 0 else 0
     mean_right = np.mean(over_thresh) if len(over_thresh) > 0 else 0
-    contrast_weight = (mean_right - mean_left) / 32
-    contrast_weight = min(contrast_weight, 1.5)
-    contrast_weight = max(contrast_weight, 0.3)
+    contrast_ratio = (mean_right - mean_left) / 32
+    contrast_weight = np.power(contrast_ratio, 0.2)
+    contrast_weight = np.clip(contrast_weight, 0.2, 1.2)
 
     # calculate distribution of pixels less than threshold and greater than threshold
     n_under_thresh = len(under_thresh)
     n_over_thresh = len(over_thresh)
-    n_total = n_under_thresh + n_over_thresh
-    balance_weight = np.cos(np.pi / 3 * (n_under_thresh - n_over_thresh) / n_total)  # np.pi/2 * 2/3
-    balance_weight = min(balance_weight, 1.2)
-    balance_weight = max(balance_weight, 0.3)
+    balance_ratio = (n_under_thresh - n_over_thresh) / (n_under_thresh + n_over_thresh)
+    balance_weight = 1.2 * np.power(np.cos(np.pi / 3 * balance_ratio), 0.8)
+    balance_weight = np.clip(balance_weight, 0.5, 1.2)
 
     weight = contrast_weight * balance_weight
-    weight = max(weight, 0.1)
     return weight

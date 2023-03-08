@@ -169,17 +169,11 @@ def get_dataloader(conf):
                             pin_memory=True,
                             )
     sample_loader = DataLoader(sample_dataset,
-                               batch_size=4,
+                               batch_size=len(sample_dataset),
                                shuffle=False,
                                pin_memory=True,
                                )
     return train_loader, val_loader, sample_loader
-
-
-def sample_loader(conf):
-    sample_dataset = HeatMapDataset(conf.root_dir, mode='sample', input_size=(400, 640))
-    sample_dataloader = DataLoader(sample_dataset, batch_size=4, shuffle=False, pin_memory=True)
-    return sample_dataloader
 
 
 def blend_image_hmap_tensor(img, hmap, alpha=0.5):
