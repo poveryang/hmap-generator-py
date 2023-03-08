@@ -4,6 +4,8 @@ from torchvision.utils import make_grid
 
 
 def next_version(log_root, exp_name):
+    if not (Path(log_root) / exp_name).exists():
+        return 1
     exp_dirs = [d for d in (Path(log_root) / exp_name).iterdir() if d.is_dir()]
     version_nums = []
     for d in exp_dirs:

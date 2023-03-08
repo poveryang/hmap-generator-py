@@ -83,7 +83,7 @@ class LitUNet(UNet, pl.LightningModule):
         cv2.imwrite(f'{self.logger.log_dir}/{self.current_epoch}.png', save_img)
 
     def configure_optimizers(self):
-        lr_lambda = warmup_lr(max_epochs=self.trainer.max_epochs, warmup_epochs=5)
+        lr_lambda = warmup_lr(max_epochs=self.trainer.max_epochs, warmup_epochs=None)
         optimizer = torch.optim.Adam(self.parameters(), lr=self.init_lr)
         lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
         return [optimizer], [lr_scheduler]
@@ -93,8 +93,8 @@ class LitUNet(UNet, pl.LightningModule):
 
         model_checkpoint = ModelCheckpoint(
             monitor='val_loss',
-            filename='hmap_{epoch:03d}_{val_loss:.4f}',
-            save_top_k=50,
+            filename='hmap_{epoch:03d}_{val_loss:.6f}',
+            save_top_k=100,
             mode='min',
         )
 
