@@ -20,5 +20,14 @@ def blend_image_hmap_tensor(img, hmap, alpha=0.5):
     hmap = torch.sigmoid(hmap)
     blended_batch = img * alpha + hmap * (1 - alpha)
     blended_batch = (blended_batch - blended_batch.min()) / (blended_batch.max() - blended_batch.min())
-    blended_grid = make_grid(blended_batch, nrow=2)
+    blended_grid = make_grid(blended_batch, nrow=3)
     return blended_grid
+
+
+def concat_image_hmap_tensor(img, hmap):
+    img = img * 0.2349 + 0.4330
+    img = img.repeat(1, 3, 1, 1)  # image n1hw -> n3hw
+    hmap = torch.sigmoid(hmap)
+    concat_batch = torch.cat([img, hmap], dim=0)
+    concat_grid = make_grid(concat_batch, nrow=3)
+    return concat_grid

@@ -9,28 +9,28 @@ from utils import next_version
 # ---------- Configs ----------
 home_path = os.path.expanduser('~')
 log_dir = os.path.join(home_path, 'ExpLogs')
-exp_name = 'UNet'
+exp_name = 'HMapUNet'
 version = next_version(log_dir, exp_name)
 
 conf = Namespace(data=Namespace(), model=Namespace(), train=Namespace())
 
 # data conf
 conf.data.batch_size = 16
-conf.data.num_workers = 8
+conf.data.num_workers = 16
 conf.data.root_dir = f'{home_path}/Datasets/barcode'
 conf.data.input_size = (400, 640)
 
 # model conf
 conf.model.in_channels = 1
 conf.model.n_classes = 3
-conf.model.inc_channels = 16
+conf.model.inc_channels = 32
 conf.model.init_lr = 1e-3
 
 # train conf
 conf.train.accelerator = 'gpu'
 conf.train.devices = [0, 1, 2, 3, 4, 5, 6, 7]
 conf.train.sync_batchnorm = True
-conf.train.max_epochs = 100
+conf.train.max_epochs = 200
 conf.train.profiler = 'simple'
 conf.train.default_root_dir = log_dir
 conf.train.limit_train_batches = 1.

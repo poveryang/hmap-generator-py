@@ -27,7 +27,7 @@ def generate_hmap(instances, image):
         box_y2 = min(img_h, box_y2)
 
         # 2. Calculate the weight of the box patch
-        patch_w, patch_h = box_w//2,  box_h//2
+        patch_w, patch_h = box_w//1.5,  box_h//1.5
         patch_x1, patch_y1 = box_x1 + patch_w//2, box_y1 + patch_h//2
         patch_x2, patch_y2 = box_x2 - patch_w//2, box_y2 - patch_h//2
         if (patch_x2 - patch_x1) < 1 or (patch_y2 - patch_y1) < 1:

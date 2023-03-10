@@ -22,12 +22,12 @@ class HeatMapDataset(Dataset):
     def __getitem__(self, idx):
         img_path = self.img_paths[idx]
         image = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
-        image1 = self.random_jitter(image)
+        image = self.random_jitter(image)
 
         instances = self.labels[idx]
-        hmap = generate_hmap(instances, image1)
+        hmap = generate_hmap(instances, image)
 
-        image_tensor, hmap_tensor = self.geometric_trans(image1, hmap)
+        image_tensor, hmap_tensor = self.geometric_trans(image, hmap)
         return image_tensor, hmap_tensor
 
     def __len__(self):

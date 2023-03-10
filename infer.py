@@ -5,10 +5,48 @@ from thop import profile
 from torch.utils.data import DataLoader
 import torchvision.transforms.functional as TF
 
-from dataset.hamp_ds import HeatMapDataset
+from dataset.hamp_ds import get_dataloader
 from model.unet_pl import LitUNet
 from configs.conf_linux import conf
 import matplotlib.pyplot as plt
+from utils.misc import blend_image_hmap_tensor
+import torch.nn as nn
+
+
+class HMapLoss(nn.Module):
+    def __init__(self, gamma=2.0, alpha=0.2):
+        super(HMapLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+
+    def forward(self, pred, target):
+        diff = torch.abs(target - torch.sigmoid(pred))
+        pos_mask = target >= 0.004
+        neg_mask = target < 0.004
+        pos_ratio = len(pos_mask) / (len(pos_mask) + len(neg_mask))
+        alpha = max(self.alpha, pos_ratio)
+
+        pos_loss = -torch.pow(diff[pos_mask], self.gamma) * torch.log(1-diff[pos_mask]) * target[pos_mask]
+        neg_loss = -torch.pow(diff[neg_mask], self.gamma) * torch.log(1-diff[neg_mask])
+        loss = alpha * torch.mean(pos_loss) + (1-alpha) * torch.mean(neg_loss)
+        return loss
+
+
+hmap_loss = HMapLoss()
+
+
+def batch_infer(model_path, batch_size=1):
+    conf.data.batch_size = batch_size
+    train_loader, val_loader, sample_loader = get_dataloader(conf.data)
+    model = LitUNet(conf.model).load_from_checkpoint(model_path, model_conf=conf.model)
+    model.eval()
+
+    for i, (in_tensor, hmap_gt) in enumerate(val_loader):
+        hmap_tensor = model(in_tensor)
+        pos_loss, neg_loss = hmap_loss(hmap_tensor, hmap_gt)
+        blend_image = blend_image_hmap_tensor(in_tensor, hmap_tensor, alpha=0.5)
+        blend_image = np.array(TF.to_pil_image(blend_image))
+        pass
 
 
 # Inference on a single image
@@ -68,10 +106,12 @@ def to_onnx(model_path, onnx_path):
 
 
 if __name__ == '__main__':
+    batch_infer("./test/ckpt/hmap_epoch=082_val_loss=0.000288.ckpt", batch_size=1)
+
+    # infer_single_image(
+    #     model_path="./test/ckpt/hmap_epoch=149_val_loss=0.000295.ckpt",
+    #     image_path="./test/data/exp-3.png"
+    # )
+
     # to_onnx("ckpt/hmap-v3-e99-fp32.ckpt",
     #         "ckpt/hmap-v3-e99-fp32.onnx")
-
-    infer_single_image(
-        model_path="./test/ckpt/hmap_epoch=099_val_loss=0.000295.ckpt",
-        image_path="./test/data/exp-3.png"
-    )

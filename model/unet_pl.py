@@ -8,11 +8,10 @@ from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 
 from model.unet import UNet
 from utils.lr_utils import warmup_lr
-from utils.misc import blend_image_hmap_tensor
+from utils.misc import blend_image_hmap_tensor, concat_image_hmap_tensor
 
 
 def sigmoid_focal_loss(preds, targets, alpha=0.25, gamma=2, reduction="mean") -> torch.Tensor:
-    preds = torch.sigmoid(preds)
     ce_loss = F.binary_cross_entropy_with_logits(preds, targets, reduction="none")
     p_t = preds * targets + (1 - preds) * (1 - targets)
     loss = ce_loss * ((1 - p_t) ** gamma)
@@ -35,37 +34,44 @@ def sigmoid_focal_loss(preds, targets, alpha=0.25, gamma=2, reduction="mean") ->
     return loss
 
 
-class FocalLoss(nn.Module):
-    def __init__(self, gamma=2.0, alpha=1.0, reduction="mean"):
-        super(FocalLoss, self).__init__()
-        self.__gamma = gamma
-        self.__alpha = alpha
-        self.__loss = nn.BCEWithLogitsLoss(reduction=reduction)
+class HMapLoss(nn.Module):
+    def __init__(self, gamma=2.0, alpha=0.25):
+        super(HMapLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
 
     def forward(self, pred, target):
-        loss = self.__loss(input=pred, target=target)
-        loss *= self.__alpha * torch.pow(torch.abs(target - torch.sigmoid(pred)), self.__gamma)  # gamma相当于Heatmap的alpha
+        diff = torch.abs(target - torch.sigmoid(pred))
+        pos_mask = target >= 0.004
+        neg_mask = target < 0.004
+        pos_ratio = len(pos_mask) / (len(pos_mask) + len(neg_mask))
+        alpha = max(self.alpha, pos_ratio)
+
+        pos_loss = -torch.pow(diff[pos_mask], self.gamma) * torch.log(1-diff[pos_mask]) * target[pos_mask]
+        neg_loss = -torch.pow(diff[neg_mask], self.gamma) * torch.log(1-diff[neg_mask])
+        loss = alpha * torch.mean(pos_loss) + (1-alpha) * torch.mean(neg_loss)
         return loss
 
 
 class LitUNet(UNet, pl.LightningModule):
     def __init__(self, model_conf, sample_loader=None):
         super().__init__(**vars(model_conf))
-        self.loss = FocalLoss()
+        self.loss = HMapLoss()
         self.sample_loader = sample_loader
         self.init_lr = model_conf.init_lr
+        self.save_hyperparameters(model_conf)
 
     def training_step(self, batch, batch_idx):
         images, targets = batch
         preds = self.forward(images)
-        loss = sigmoid_focal_loss(preds, targets)
+        loss = self.loss(preds, targets)
         self.log('train_loss', loss, on_step=False, on_epoch=True, logger=True, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         images, targets = batch
         preds = self.forward(images)
-        loss = sigmoid_focal_loss(preds, targets)
+        loss = self.loss(preds, targets)
         self.log('val_loss', loss, on_step=False, on_epoch=True, logger=True, sync_dist=True)
         return loss
 
@@ -75,7 +81,8 @@ class LitUNet(UNet, pl.LightningModule):
         images, targets = next(iter(self.sample_loader))
         images = images.to(self.device)
         preds = self.forward(images)
-        img_with_hmap = blend_image_hmap_tensor(images, preds, alpha=0.3)
+        # img_with_hmap = blend_image_hmap_tensor(images, preds, alpha=0.3)
+        img_with_hmap = concat_image_hmap_tensor(images, preds)
         self.logger.experiment.add_image(f'image with hmap', img_with_hmap, self.current_epoch)
 
         save_img = (img_with_hmap.detach().cpu().numpy().transpose((1, 2, 0)) * 255).astype('uint8')
