@@ -16,7 +16,7 @@ def main():
     # 1 INIT LIGHTNING MODEL
     # ------------------------
     train_loader, val_loader, sample_loader = get_dataloader(conf.data)
-    model = LitUNet(conf.model, sample_loader)
+    model = LitUNet(conf.model, sample_loader).load_from_checkpoint(conf.model.ckpt_path, model_conf=conf.model)
 
     # ------------------------
     # 2 INIT TRAINER

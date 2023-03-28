@@ -34,6 +34,24 @@ def sigmoid_focal_loss(preds, targets, alpha=0.25, gamma=2, reduction="mean") ->
     return loss
 
 
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=5.0, alpha=0.5):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+
+    def forward(self, pred, target):
+        pred = torch.sigmoid(pred)
+        bce_loss = F.binary_cross_entropy(pred, target, reduction="none")
+        p_t = pred * target + (1 - pred) * (1 - target)
+        if self.alpha != 0.5:
+            alpha_t = self.alpha * target + (1 - self.alpha) * (1 - target)
+        else:
+            alpha_t = 1
+        loss = alpha_t * torch.pow(1 - p_t, self.gamma) * bce_loss
+        return loss.mean()
+
+
 class HMapLoss(nn.Module):
     def __init__(self, gamma=2.0, alpha=0.25):
         super(HMapLoss, self).__init__()
@@ -44,19 +62,20 @@ class HMapLoss(nn.Module):
         diff = torch.abs(target - torch.sigmoid(pred))
         pos_mask = target >= 0.004
         neg_mask = target < 0.004
-        pos_ratio = len(pos_mask) / (len(pos_mask) + len(neg_mask))
+
+        pos_loss = -torch.pow(diff[pos_mask], self.gamma) * torch.log(1-diff[pos_mask] + 1e-14) * target[pos_mask]
+        neg_loss = -torch.pow(diff[neg_mask], self.gamma) * torch.log(1-diff[neg_mask] + 1e-14)
+        pos_ratio = len(pos_loss) / (len(pos_loss) + len(neg_loss))
         alpha = max(self.alpha, pos_ratio)
 
-        pos_loss = -torch.pow(diff[pos_mask], self.gamma) * torch.log(1-diff[pos_mask]) * target[pos_mask]
-        neg_loss = -torch.pow(diff[neg_mask], self.gamma) * torch.log(1-diff[neg_mask])
         loss = alpha * torch.mean(pos_loss) + (1-alpha) * torch.mean(neg_loss)
-        return loss
+        return loss, torch.mean(pos_loss), torch.mean(neg_loss)
 
 
 class LitUNet(UNet, pl.LightningModule):
     def __init__(self, model_conf, sample_loader=None):
         super().__init__(**vars(model_conf))
-        self.loss = HMapLoss()
+        self.loss = FocalLoss(model_conf.gamma, model_conf.alpha)
         self.sample_loader = sample_loader
         self.init_lr = model_conf.init_lr
         self.save_hyperparameters(model_conf)
@@ -64,15 +83,22 @@ class LitUNet(UNet, pl.LightningModule):
     def training_step(self, batch, batch_idx):
         images, targets = batch
         preds = self.forward(images)
+        # loss, pos_loss, neg_loss = self.loss(preds, targets)
         loss = self.loss(preds, targets)
-        self.log('train_loss', loss, on_step=False, on_epoch=True, logger=True, sync_dist=True)
+        self.log('train_loss', loss, on_step=True, on_epoch=False, logger=True, sync_dist=True)
+        # self.log('train/pos_loss', torch.mean(pos_loss), on_step=True, on_epoch=False, logger=True, sync_dist=True)
+        # self.log('train/neg_loss', torch.mean(neg_loss), on_step=True, on_epoch=False, logger=True, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         images, targets = batch
         preds = self.forward(images)
+        # loss, pos_loss, neg_loss = self.loss(preds, targets)
         loss = self.loss(preds, targets)
         self.log('val_loss', loss, on_step=False, on_epoch=True, logger=True, sync_dist=True)
+        # self.log('val/pos_loss', torch.mean(pos_loss), on_step=False, on_epoch=True, logger=True, sync_dist=True)
+        # self.log('val/neg_loss', torch.mean(neg_loss), on_step=False, on_epoch=True, logger=True, sync_dist=True)
+
         return loss
 
     def on_validation_end(self):
@@ -90,7 +116,7 @@ class LitUNet(UNet, pl.LightningModule):
         cv2.imwrite(f'{self.logger.log_dir}/{self.current_epoch}.png', save_img)
 
     def configure_optimizers(self):
-        lr_lambda = warmup_lr(max_epochs=self.trainer.max_epochs, warmup_epochs=None)
+        lr_lambda = warmup_lr(max_epochs=self.trainer.max_epochs, warmup_epochs=None, warmup_factor=0.05)
         optimizer = torch.optim.Adam(self.parameters(), lr=self.init_lr)
         lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
         return [optimizer], [lr_scheduler]

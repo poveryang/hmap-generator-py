@@ -1,9 +1,11 @@
 import cv2
+import glob
 import numpy as np
 import torch
 from thop import profile
 from torch.utils.data import DataLoader
 import torchvision.transforms.functional as TF
+import seaborn as sns
 
 from dataset.hamp_ds import get_dataloader
 from model.unet_pl import LitUNet
@@ -34,6 +36,10 @@ class HMapLoss(nn.Module):
 
 hmap_loss = HMapLoss()
 
+model_path="./hmap_epoch=049_val_loss=0.000378.ckpt"
+model = LitUNet(conf.model).load_from_checkpoint(model_path, model_conf=conf.model)
+model.eval()
+
 
 def batch_infer(model_path, batch_size=1):
     conf.data.batch_size = batch_size
@@ -50,34 +56,36 @@ def batch_infer(model_path, batch_size=1):
 
 
 # Inference on a single image
-def infer_single_image(model_path, image_path):
-    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+def infer_single_image(image_path):
+    fig, ax = plt.subplots(1, 2, figsize=(20, 5))
 
-    model = LitUNet(conf.model).load_from_checkpoint(model_path, model_conf=conf.model)
-    model.eval()
+
 
     # preprocess
     image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
     image_tensor = preprocess(image)
-    ax[0].imshow(image, cmap='gray')
-    ax[0].set_title('input image')
 
     # inference
     hmap_tensor = model(image_tensor)
 
     # postprocess
     hmap = postprocess(hmap_tensor)
-    ax[1].imshow(hmap)
+    oned_hmap = hmap[:, :, 0]
+    sns.heatmap(oned_hmap, ax=ax[1], cmap='jet', xticklabels=False, yticklabels=False)
     ax[1].set_title('heat map')
+    save_path = image_path.replace('.png', '_hmap.png')
 
-    # blend
-    image = (image / 255.0).astype(np.float32)
-    image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+    # blend image and hmap
+    blend_image = blend_image_hmap_tensor(image_tensor, hmap_tensor, alpha=0.5)
+    blend_image = np.array(TF.to_pil_image(blend_image))
 
-    blend = cv2.addWeighted(image, 0.5, hmap, 0.5, 0)
-    ax[2].imshow(blend)
-    ax[2].set_title('blended image')
-    plt.show()
+    ax[0].imshow(blend_image, cmap='gray')
+    ax[0].set_title('image with hmap')
+    ax[0].axis('off')
+
+    # plt.show()
+    fig.savefig(save_path, dpi=300)
+
 
 
 def preprocess(image):
@@ -106,11 +114,23 @@ def to_onnx(model_path, onnx_path):
 
 
 if __name__ == '__main__':
-    batch_infer("./test/ckpt/hmap_epoch=082_val_loss=0.000288.ckpt", batch_size=1)
+    # batch_infer("./test/ckpt/hmap_epoch=082_val_loss=0.000288.ckpt", batch_size=1)
+    from multiprocessing import Pool
 
+    files = glob.glob("/Users/yjunj/Downloads/一维码-有码/*.png")
+
+    with Pool(16) as p:
+        p.map(infer_single_image, files)
+
+
+    # for file in files:
+    #     infer_single_image(
+    #         model_path="./hmap_epoch=049_val_loss=0.000378.ckpt",
+    #         image_path=file
+    #     )
     # infer_single_image(
-    #     model_path="./test/ckpt/hmap_epoch=149_val_loss=0.000295.ckpt",
-    #     image_path="./test/data/exp-3.png"
+    #     model_path="./hmap_epoch=049_val_loss=0.000378.ckpt",
+    #     image_path="/Users/yjunj/Downloads/一维码-有码/20210324124313616.png"
     # )
 
     # to_onnx("ckpt/hmap-v3-e99-fp32.ckpt",
